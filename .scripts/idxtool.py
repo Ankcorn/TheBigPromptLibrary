@@ -35,9 +35,12 @@ def rename_gpts():
         # New full file name with ID prefix
         new_fn = os.path.join(os.path.dirname(gpt.filename), f"{id.id}_{basename}")
         print(f"[+] {basename} -> {os.path.basename(new_fn)}")
-        if os.system(f"git mv \"{gpt.filename}\" \"{new_fn}\"") == 0:
+        git_mv_ret = os.system(f"git mv \"{gpt.filename}\" \"{new_fn}\"")
+        if git_mv_ret == 0:
             nb_ok += 1
             continue
+
+        print(f"[!] git mv failed (exit {git_mv_ret}): {basename} -> {os.path.basename(new_fn)}")
 
         # If git mv failed, then try os.rename
         try:
@@ -45,7 +48,7 @@ def rename_gpts():
             nb_ok += 1
             continue
         except OSError as e:
-            print(f"Rename error: {e.strerror}")
+            print(f"[!] rename failed: {basename} -> {os.path.basename(new_fn)}: {e.strerror}")
 
     msg = f"Renamed {nb_ok} out of {nb_total} GPT files."
     ok = nb_ok == nb_total
@@ -63,7 +66,9 @@ def parse_gpt_file(filename) -> Tuple[bool, str]:
         dst_fn = os.path.join(
             os.path.dirname(filename),
             f"{file_name_without_ext}.new.md")
-        gpt.save(dst_fn)
+        save_ok, save_msg = gpt.save(dst_fn)
+        if not save_ok:
+            print(f"[!] failed to save '{dst_fn}': {save_msg}")
     else:
         print(gpt)
 
@@ -102,8 +107,8 @@ def rebuild_toc(toc_out: str = '') -> Tuple[bool, str]:
     # Write the TOC file all the way up to the marker line
     try:
         ofile = open(toc_out, 'w', encoding='utf-8')
-    except:
-        return (False, f"Failed to open '{toc_out}' for writing.")
+    except OSError as e:
+        return (False, f"Failed to open '{toc_out}' for writing: {e.strerror}")
 
     # Count GPTs
     enumerated_gpts = list(enum_gpts())
